@@ -1,0 +1,2200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventec PE Platform</title>
+    <!-- Tailwind CSS & FontAwesome -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js, Chart.js Plugin DataLabels, SheetJS, Frappe Gantt -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/frappe-gantt/0.6.1/frappe-gantt.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/frappe-gantt/0.6.1/frappe-gantt.min.js"></script>
+    <!-- Tailwind CSS Fallback -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" />
+    <style>
+        .gantt .grid-header { fill: #1e293b; stroke: #334155; }
+        .gantt .grid-row { fill: #0f172a; }
+        .gantt .grid-row:nth-child(even) { fill: #1e293b; }
+        .gantt .row-line, .gantt .tick { stroke: #334155; }
+        .gantt .lower-text, .gantt .upper-text { fill: #94a3b8; font-weight: 600; }
+        .gantt .bar { fill: #3b82f6; }
+        .gantt .bar-progress { fill: #2563eb; }
+        .gantt .bar-label { fill: #ffffff; font-weight: bold; font-size: 11px; }
+        .gantt-container { overflow-x: auto; }
+        
+        /* Estilos para Control de Documentos / Tabla tipo Excel */
+        .doc-table th, .doc-table td {
+            text-align: center;
+            vertical-align: middle;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            padding: 6px 8px !important;
+        }
+        .doc-input {
+            background: rgba(15, 23, 42, 0.6);
+            width: 100%;
+            padding: 4px 6px;
+            color: #f1f5f9;
+            outline: none;
+            border: 1px solid #334155;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+        .doc-input:focus {
+            background: #0f172a;
+            border-color: #06b6d4;
+        }
+        .doc-checkbox {
+            width: 16px;
+            height: 16px;
+            accent-color: #06b6d4;
+            cursor: pointer;
+        }
+
+        /* Estilos de Estado */
+        .st-ok { background-color: rgba(16, 185, 129, 0.25); color: #34d399; }
+        .st-p { background-color: rgba(245, 158, 11, 0.25); color: #fcd34d; }
+        .st-na { background-color: rgba(30, 58, 138, 0.2); color: #60a5fa; }
+        .st-nok { background-color: rgba(239, 68, 68, 0.25); color: #f87171; }
+
+        /* Estilos para botón activo con iluminación Azul Neón */
+        .nav-btn-active {
+            background-color: #0284c7 !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 12px #00f0ff, 0 0 20px #00f0ff !important;
+            border: 1px solid #38bdf8 !important;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen">
+
+    <!-- Pantalla de Login Simplificada -->
+    <div id="login-screen" class="fixed inset-0 bg-slate-900 z-40 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-md w-full shadow-2xl space-y-6">
+            <div class="text-center">
+                <div class="inline-flex p-3 bg-blue-600/20 text-blue-400 rounded-full mb-2">
+                    <i class="fa-solid fa-database text-3xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-white">Inventec PE Platform</h1>
+                <p class="text-xs text-slate-400 mt-1">PE daily Solutions</p>
+            </div>
+
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Usuario</label>
+                    <input type="text" id="login-user" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500" value="">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Contraseña</label>
+                    <input type="password" id="login-pass" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500" value="">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-all shadow-lg text-sm">
+                    Iniciar Sesión
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- App Principal -->
+    <div id="app" class="hidden min-h-screen flex flex-col">
+        <!-- Header con Menú Global -->
+        <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-30 px-6 py-4 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-3 cursor-pointer" onclick="showSection('main-menu')">
+                <div class="bg-blue-600 p-2 rounded-lg text-white">
+                    <i class="fa-solid fa-layer-group text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold">Inventec PE</h1>
+                    <p class="text-xs text-slate-400">Where Team Work is Key</p>
+                </div>
+            </div>
+
+            <!-- Navegación entre Módulos -->
+            <nav id="top-nav" class="hidden flex items-center gap-2">
+                <button type="button" id="nav-btn-main-menu" onclick="showSection('main-menu')" class="nav-btn text-xs bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-slate-200 transition-all">
+                    <i class="fa-solid fa-house mr-1"></i> Menú
+                </button>
+                <button type="button" id="nav-btn-activities-module" onclick="showSection('activities-module')" class="nav-btn text-xs bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-slate-200 transition-all">
+                    <i class="fa-solid fa-list-check mr-1"></i> Actividades
+                </button>
+                <button type="button" id="nav-btn-wi-plan-module" onclick="showSection('wi-plan-module')" class="nav-btn text-xs bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-slate-200 transition-all">
+                    <i class="fa-solid fa-clipboard-check mr-1"></i> WI Plan
+                </button>
+                <button type="button" id="nav-btn-doc-control-module" onclick="showSection('doc-control-module')" class="nav-btn text-xs bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-slate-200 transition-all">
+                    <i class="fa-solid fa-file-contract mr-1"></i> Control de Documentos
+                </button>
+                <button type="button" id="nav-btn-gallery-module" onclick="showSection('gallery-module')" class="nav-btn text-xs bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-slate-200 transition-all">
+                    <i class="fa-solid fa-images mr-1"></i> Galería
+                </button>
+            </nav>
+
+            <div class="flex items-center gap-3">
+                <div id="user-display" class="text-sm font-semibold text-blue-400 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-700"></div>
+                <button type="button" onclick="openUsersListModal()" class="text-xs bg-cyan-700 hover:bg-cyan-600 px-3 py-2 rounded-lg text-slate-100 flex items-center gap-1.5 shadow" title="Gestión de Usuarios"><i class="fa-solid fa-users"></i> Usuarios</button>
+                <button type="button" onclick="openChangePasswordModal()" class="text-xs bg-amber-700 hover:bg-amber-600 px-3 py-2 rounded-lg text-slate-100" title="Cambiar Contraseña"><i class="fa-solid fa-key mr-1"></i> Clave</button>
+                <button type="button" onclick="openUserModal()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg text-slate-200"><i class="fa-solid fa-user-plus mr-1"></i> +Usuario</button>
+                <button type="button" onclick="logout()" class="text-xs bg-red-600/20 text-red-400 hover:bg-red-600/30 px-3 py-2 rounded-lg"><i class="fa-solid fa-right-from-bracket mr-1"></i> Salir</button>
+            </div>
+        </header>
+
+        <!-- SECCIÓN 1: MENÚ PRINCIPAL -->
+        <section id="main-menu" class="flex-1 flex items-center justify-center p-6">
+            <div class="max-w-5xl w-full text-center space-y-8">
+                <div>
+                    <h2 class="text-3xl font-extrabold text-white">Menú Principal</h2>
+                    <p class="text-slate-400 text-sm mt-2">Selecciona el módulo al que deseas acceder</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div onclick="showSection('activities-module')" class="bg-slate-800 border border-slate-700 hover:border-blue-500 rounded-2xl p-6 cursor-pointer transition-all hover:scale-105 shadow-xl flex flex-col items-center group">
+                        <div class="p-5 bg-blue-600/20 text-blue-400 rounded-full mb-4 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                            <i class="fa-solid fa-list-check text-3xl"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-white mb-2">Actividades</h3>
+                        <p class="text-xs text-slate-400 text-center">Dashboard, métricas, seguimiento de tareas y Gantt.</p>
+                    </div>
+
+                    <div onclick="showSection('wi-plan-module')" class="bg-slate-800 border border-slate-700 hover:border-amber-500 rounded-2xl p-6 cursor-pointer transition-all hover:scale-105 shadow-xl flex flex-col items-center group">
+                        <div class="p-5 bg-amber-600/20 text-amber-400 rounded-full mb-4 group-hover:bg-amber-600 group-hover:text-white transition-all">
+                            <i class="fa-solid fa-clipboard-check text-3xl"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-white mb-2">WI Plan</h3>
+                        <p class="text-xs text-slate-400 text-center">Planificación independiente de Instrucciones de Trabajo.</p>
+                    </div>
+
+                    <div onclick="showSection('doc-control-module')" class="bg-slate-800 border border-slate-700 hover:border-cyan-500 rounded-2xl p-6 cursor-pointer transition-all hover:scale-105 shadow-xl flex flex-col items-center group">
+                        <div class="p-5 bg-cyan-600/20 text-cyan-400 rounded-full mb-4 group-hover:bg-cyan-600 group-hover:text-white transition-all">
+                            <i class="fa-solid fa-file-contract text-3xl"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-white mb-2">Control de Documentos</h3>
+                        <p class="text-xs text-slate-400 text-center">Gestión por número de parte, originador, fases de control, historial y adjuntos.</p>
+                    </div>
+
+                    <div onclick="showSection('gallery-module')" class="bg-slate-800 border border-slate-700 hover:border-emerald-500 rounded-2xl p-6 cursor-pointer transition-all hover:scale-105 shadow-xl flex flex-col items-center group">
+                        <div class="p-5 bg-emerald-600/20 text-emerald-400 rounded-full mb-4 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                            <i class="fa-solid fa-images text-3xl"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-white mb-2">Galería</h3>
+                        <p class="text-xs text-slate-400 text-center">Sube y organiza fotos de procesos técnicos.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN 2: MÓDULO DE ACTIVIDADES -->
+        <section id="activities-module" class="hidden flex-1 p-6 space-y-8 max-w-7xl mx-auto w-full">
+            <div id="alerts-container" class="space-y-2"></div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex items-center gap-4">
+                    <div class="p-3 bg-blue-500/10 text-blue-400 rounded-lg"><i class="fa-solid fa-tasks text-2xl"></i></div>
+                    <div><p class="text-xs text-slate-400 uppercase font-bold">Total Actividades</p><p id="metric-total" class="text-2xl font-black">0</p></div>
+                </div>
+                <div class="bg-slate-800 border border-amber-500/30 p-4 rounded-xl flex items-center gap-4">
+                    <div class="p-3 bg-amber-500/10 text-amber-400 rounded-lg"><i class="fa-solid fa-clock text-2xl"></i></div>
+                    <div><p class="text-xs text-amber-400 uppercase font-bold">Por Vencer (3 Días)</p><p id="metric-expiring" class="text-2xl font-black text-amber-400">0</p></div>
+                </div>
+                <div class="bg-slate-800 border border-emerald-500/30 p-4 rounded-xl flex items-center gap-4">
+                    <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-lg"><i class="fa-solid fa-circle-check text-2xl"></i></div>
+                    <div><p class="text-xs text-emerald-400 uppercase font-bold">Completadas</p><p id="metric-completed" class="text-2xl font-black text-emerald-400">0</p></div>
+                </div>
+                <div class="bg-slate-800 border border-purple-500/30 p-4 rounded-xl flex items-center gap-4">
+                    <div class="p-3 bg-purple-500/10 text-purple-400 rounded-lg"><i class="fa-solid fa-users text-2xl"></i></div>
+                    <div><p class="text-xs text-purple-400 uppercase font-bold">Asignados Activos</p><p id="metric-users" class="text-2xl font-black">0</p></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl">
+                    <h3 class="text-md font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-chart-bar text-blue-400"></i> Actividades por Persona</h3>
+                    <div class="h-64"><canvas id="chartUsers"></canvas></div>
+                </div>
+                <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl">
+                    <h3 class="text-md font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-chart-pie text-emerald-400"></i> Estado de Avances</h3>
+                    <div class="h-64"><canvas id="chartStatus"></canvas></div>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/80 border border-amber-500/40 rounded-xl p-5 shadow-lg">
+                <h3 class="text-md font-bold text-amber-400 flex items-center gap-2 mb-4">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Próximas a Vencer (Siguientes 3 Días)
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-900/50 text-slate-400 uppercase text-xs border-b border-slate-700">
+                            <tr><th class="p-3">Título</th><th class="p-3">Responsable</th><th class="p-3">Vencimiento</th><th class="p-3">Estado</th></tr>
+                        </thead>
+                        <tbody id="expiring-table-body" class="divide-y divide-slate-700/50"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-4">
+                <div class="flex flex-wrap justify-between items-center gap-4 border-b border-slate-700 pb-4">
+                    <h3 class="text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-list text-blue-400"></i> Listado General</h3>
+                    <div class="flex gap-2">
+                        <button type="button" id="btn-add-activity" onclick="openTaskModal(null, 'activities')" class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-lg flex items-center gap-2"><i class="fa-solid fa-plus"></i> Nueva Actividad</button>
+                        <button type="button" onclick="exportToExcel('activities')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 py-2 rounded-lg flex items-center gap-2"><i class="fa-solid fa-file-excel"></i> Exportar a Excel</button>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700 flex flex-wrap gap-3 items-center justify-between">
+                    <div class="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+                        <div class="relative flex-1 min-w-[180px]">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                            <input type="text" id="task-search-input" oninput="filterTasks()" placeholder="Buscar por título..." class="w-full bg-slate-800 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs outline-none focus:border-blue-500">
+                        </div>
+                        <select id="task-status-filter" onchange="filterTasks()" class="bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-xs outline-none focus:border-blue-500">
+                            <option value="ALL">Todos los Estados</option>
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="En Proceso">En Proceso</option>
+                            <option value="Completado">Completado</option>
+                        </select>
+                        <select id="task-user-filter" onchange="filterTasks()" class="bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-xs outline-none focus:border-blue-500">
+                            <option value="ALL">Todos los Responsables</option>
+                        </select>
+                    </div>
+                    <button type="button" onclick="resetTaskFilters()" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg transition-all">
+                        <i class="fa-solid fa-rotate-right mr-1"></i> Limpiar Filtros
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-900 text-slate-400 uppercase text-xs">
+                            <tr><th class="p-3">ID</th><th class="p-3">Título</th><th class="p-3">Asignado</th><th class="p-3">Inicio</th><th class="p-3">Fin</th><th class="p-3">Avance</th><th class="p-3">Estado</th><th class="p-3 text-right">Acciones</th></tr>
+                        </thead>
+                        <tbody id="tasks-table-body" class="divide-y divide-slate-700"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-4">
+                <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                    <h3 class="text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-sliders text-purple-400"></i> Gantt Interactivo</h3>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="changeGanttView('Day', 'activities')" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded">Día</button>
+                        <button type="button" onclick="changeGanttView('Week', 'activities')" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded">Semana</button>
+                        <button type="button" onclick="changeGanttView('Month', 'activities')" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded">Mes</button>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-400"><i class="fa-solid fa-circle-info text-blue-400"></i> Haz <strong>doble clic</strong> en cualquiera de las barras para ver comentarios y adjuntos.</p>
+                <div id="gantt-container" class="gantt-container w-full min-h-[250px]"></div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN WI PLAN -->
+        <section id="wi-plan-module" class="hidden flex-1 p-6 space-y-8 max-w-7xl mx-auto w-full">
+            <div id="wi-alerts-container" class="space-y-2"></div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex items-center gap-4">
+                    <div class="p-3 bg-amber-500/10 text-amber-400 rounded-lg"><i class="fa-solid fa-clipboard-check text-2xl"></i></div>
+                    <div><p class="text-xs text-slate-400 uppercase font-bold">Total WI Plans</p><p id="wi-metric-total" class="text-2xl font-black">0</p></div>
+                </div>
+                <div class="bg-slate-800 border border-amber-500/30 p-4 rounded-xl flex items-center gap-4">
+                    <div class="p-3 bg-amber-500/10 text-amber-400 rounded-lg"><i class="fa-solid fa-clock text-2xl"></i></div>
+                    <div><p class="text-xs text-amber-400 uppercase font-bold">Por Vencer (3 Días)</p><p id="wi-metric-expiring" class="text-2xl font-black text-amber-400">0</p></div>
+                </div>
+                <div class="bg-slate-800 border border-emerald-500/30 p-4 rounded-xl flex items-center gap-4">
+                    <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-lg"><i class="fa-solid fa-circle-check text-2xl"></i></div>
+                    <div><p class="text-xs text-emerald-400 uppercase font-bold">Completados</p><p id="wi-metric-completed" class="text-2xl font-black text-emerald-400">0</p></div>
+                </div>
+                <div class="bg-slate-800 border border-purple-500/30 p-4 rounded-xl flex items-center gap-4">
+                    <div class="p-3 bg-purple-500/10 text-purple-400 rounded-lg"><i class="fa-solid fa-users text-2xl"></i></div>
+                    <div><p class="text-xs text-purple-400 uppercase font-bold">Asignados Activos</p><p id="wi-metric-users" class="text-2xl font-black">0</p></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl">
+                    <h3 class="text-md font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-chart-bar text-amber-400"></i> WI Plan por Persona</h3>
+                    <div class="h-64"><canvas id="wiChartUsers"></canvas></div>
+                </div>
+                <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl">
+                    <h3 class="text-md font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-chart-pie text-emerald-400"></i> Estado de Avances</h3>
+                    <div class="h-64"><canvas id="wiChartStatus"></canvas></div>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/80 border border-amber-500/40 rounded-xl p-5 shadow-lg">
+                <h3 class="text-md font-bold text-amber-400 flex items-center gap-2 mb-4">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Próximos a Vencer (Siguientes 3 Días)
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-900/50 text-slate-400 uppercase text-xs border-b border-slate-700">
+                            <tr><th class="p-3">Título WI</th><th class="p-3">Responsable</th><th class="p-3">Vencimiento</th><th class="p-3">Estado</th></tr>
+                        </thead>
+                        <tbody id="wi-expiring-table-body" class="divide-y divide-slate-700/50"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-4">
+                <div class="flex flex-wrap justify-between items-center gap-4 border-b border-slate-700 pb-4">
+                    <h3 class="text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-list text-amber-400"></i> Listado General WI Plan</h3>
+                    <div class="flex gap-2">
+                        <button type="button" id="btn-add-wi-task" onclick="openWiTaskModal()" class="bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold px-4 py-2 rounded-lg flex items-center gap-2"><i class="fa-solid fa-plus"></i> Nuevo WI Plan</button>
+                        <button type="button" onclick="exportToExcel('wi')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 py-2 rounded-lg flex items-center gap-2"><i class="fa-solid fa-file-excel"></i> Exportar a Excel</button>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700 flex flex-wrap gap-3 items-center justify-between">
+                    <div class="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+                        <div class="relative flex-1 min-w-[180px]">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                            <input type="text" id="wi-search-input" oninput="filterWiTasks()" placeholder="Buscar por título WI..." class="w-full bg-slate-800 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs outline-none focus:border-amber-500">
+                        </div>
+                        <select id="wi-status-filter" onchange="filterWiTasks()" class="bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-xs outline-none focus:border-amber-500">
+                            <option value="ALL">Todos los Estados</option>
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="En Proceso">En Proceso</option>
+                            <option value="Completado">Completado</option>
+                        </select>
+                        <select id="wi-user-filter" onchange="filterWiTasks()" class="bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-xs outline-none focus:border-amber-500">
+                            <option value="ALL">Todos los Responsables</option>
+                        </select>
+                    </div>
+                    <button type="button" onclick="resetWiFilters()" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg transition-all">
+                        <i class="fa-solid fa-rotate-right mr-1"></i> Limpiar Filtros
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-900 text-slate-400 uppercase text-xs">
+                            <tr><th class="p-3">ID</th><th class="p-3">Título WI</th><th class="p-3">Asignado</th><th class="p-3">Inicio</th><th class="p-3">Fin</th><th class="p-3">Avance</th><th class="p-3">Estado</th><th class="p-3 text-right">Acciones</th></tr>
+                        </thead>
+                        <tbody id="wi-table-body" class="divide-y divide-slate-700"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-4">
+                <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                    <h3 class="text-lg font-bold flex items-center gap-2"><i class="fa-solid fa-sliders text-amber-400"></i> Gantt Interactivo WI Plan</h3>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="changeGanttView('Day', 'wi')" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded">Día</button>
+                        <button type="button" onclick="changeGanttView('Week', 'wi')" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded">Semana</button>
+                        <button type="button" onclick="changeGanttView('Month', 'wi')" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded">Mes</button>
+                    </div>
+                </div>
+                <div id="wi-gantt-container" class="gantt-container w-full min-h-[250px]"></div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN: MÓDULO CONTROL DE DOCUMENTOS -->
+        <section id="doc-control-module" class="hidden flex-1 p-6 space-y-8 max-w-[98vw] mx-auto w-full">
+            <div class="flex flex-wrap justify-between items-center gap-4 bg-slate-800 border border-slate-700 p-5 rounded-xl">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-file-contract text-cyan-400"></i> Control de Documentos</h2>
+                    <p class="text-xs text-slate-400">Administra documentos técnicos por Número de Parte, Originador, Cliente, Familia y Fases de Liberación.</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="addNewDocRow()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow transition-all">
+                        <i class="fa-solid fa-plus font-bold"></i> Agregar Documento
+                    </button>
+                    <button type="button" onclick="saveAllDocChanges()" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow transition-all">
+                        <i class="fa-solid fa-floppy-disk"></i> Guardar Cambios
+                    </button>
+                    <button type="button" onclick="exportDocControlExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow transition-all">
+                        <i class="fa-solid fa-file-excel"></i> Exportar Excel
+                    </button>
+                </div>
+            </div>
+
+            <!-- BUSCADOR POR NÚMERO DE PARTE, CLIENTE Y FAMILIA -->
+            <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex flex-wrap gap-4 items-center justify-between shadow-lg">
+                <div class="flex flex-wrap items-center gap-3 flex-1 min-w-[300px]">
+                    <div class="relative flex-1 min-w-[200px]">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                        <input type="text" id="doc-search-part" oninput="filterDocControlTable()" placeholder="Buscar por Número de Parte..." class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs outline-none focus:border-cyan-500 text-slate-100">
+                    </div>
+                    <div class="relative flex-1 min-w-[180px]">
+                        <i class="fa-solid fa-user-tie absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                        <input type="text" id="doc-search-client" oninput="filterDocControlTable()" placeholder="Buscar por Cliente..." class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs outline-none focus:border-cyan-500 text-slate-100">
+                    </div>
+                    <div class="relative flex-1 min-w-[180px]">
+                        <i class="fa-solid fa-sitemap absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                        <input type="text" id="doc-search-family" oninput="filterDocControlTable()" placeholder="Buscar por Familia..." class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs outline-none focus:border-cyan-500 text-slate-100">
+                    </div>
+                </div>
+                <button type="button" onclick="resetDocSearchFilters()" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-lg transition-all">
+                    <i class="fa-solid fa-rotate-right mr-1"></i> Limpiar Filtros
+                </button>
+            </div>
+
+            <!-- METRICAS DE CONTROL DE DOCUMENTOS -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex items-center gap-4">
+                    <div class="p-3 bg-cyan-500/10 text-cyan-400 rounded-lg"><i class="fa-solid fa-folder-open text-2xl"></i></div>
+                    <div><p class="text-xs text-slate-400 uppercase font-bold">Total Documentos</p><p id="doc-metric-total" class="text-2xl font-black">0</p></div>
+                </div>
+                <div class="bg-slate-800 border border-amber-500/30 p-4 rounded-xl flex items-center gap-4">
+                    <div class="p-3 bg-amber-500/10 text-amber-400 rounded-lg"><i class="fa-solid fa-arrows-rotate text-2xl"></i></div>
+                    <div><p class="text-xs text-amber-400 uppercase font-bold">En Actualización</p><p id="doc-metric-updating" class="text-2xl font-black text-amber-400">0</p></div>
+                </div>
+                <div class="bg-slate-800 border border-blue-500/30 p-4 rounded-xl flex items-center gap-4">
+                    <div class="p-3 bg-blue-500/10 text-blue-400 rounded-lg"><i class="fa-solid fa-shield-halved text-2xl"></i></div>
+                    <div><p class="text-xs text-blue-400 uppercase font-bold">En Control</p><p id="doc-metric-in-control" class="text-2xl font-black text-blue-400">0</p></div>
+                </div>
+                <div class="bg-slate-800 border border-emerald-500/30 p-4 rounded-xl flex items-center gap-4">
+                    <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-lg"><i class="fa-solid fa-circle-check text-2xl"></i></div>
+                    <div><p class="text-xs text-emerald-400 uppercase font-bold">Liberados / ESOP</p><p id="doc-metric-completed" class="text-2xl font-black text-emerald-400">0</p></div>
+                </div>
+            </div>
+
+            <!-- TABLA TIPO EXCEL DE CONTROL DE DOCUMENTOS CON COLUMNA ORIGINADOR -->
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 space-y-4 shadow-xl">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left doc-table border-collapse border border-slate-700">
+                        <thead class="bg-slate-900 text-slate-300 font-bold border-b border-slate-700">
+                            <tr>
+                                <th class="p-2 border border-slate-700 bg-slate-900">N° Parte</th>
+                                <th class="p-2 border border-slate-700 bg-slate-900">Modelo</th>
+                                <th class="p-2 border border-slate-700 bg-slate-900">Familia</th>
+                                <th class="p-2 border border-slate-700 bg-slate-900">Cliente</th>
+                                <th class="p-2 border border-slate-700 bg-slate-900 text-cyan-300"><i class="fa-solid fa-user-pen mr-1"></i> Originador</th>
+                                <th class="p-2 border border-slate-700 bg-amber-900/40 text-amber-300">Fase 1: Actualización</th>
+                                <th class="p-2 border border-slate-700 bg-blue-900/40 text-blue-300">Fase 2: En Control Doc.</th>
+                                <th class="p-2 border border-slate-700 bg-indigo-900/40 text-indigo-300">Fase 3: Controlado</th>
+                                <th class="p-2 border border-slate-700 bg-emerald-900/40 text-emerald-300">Fase 4: ESOP</th>
+                                <th class="p-2 border border-slate-700 bg-cyan-900/40 text-cyan-300">Porcentaje de Avance</th>
+                                <th class="p-2 border border-slate-700 bg-slate-900">Última Modificación (Historial)</th>
+                                <th class="p-2 border border-slate-700 bg-slate-900">Acciones / Adjuntos</th>
+                            </tr>
+                        </thead>
+                        <tbody id="doc-control-body" class="divide-y divide-slate-700/60 text-xs"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN 3: MÓDULO DE GALERÍA DE IMÁGENES -->
+        <section id="gallery-module" class="hidden flex-1 p-6 space-y-8 max-w-7xl mx-auto w-full">
+            <div class="flex flex-wrap justify-between items-center gap-4 bg-slate-800 border border-slate-700 p-5 rounded-xl">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2"><i class="fa-solid fa-camera text-emerald-400"></i> Galería de Fotos de Procesos</h2>
+                    <p class="text-xs text-slate-400">Sube, clasifica y consulta fotografías de líneas, estaciones y procesos.</p>
+                </div>
+                <button type="button" onclick="openGalleryModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 py-2 rounded-lg flex items-center gap-2">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Subir Nueva Foto
+                </button>
+            </div>
+
+            <div class="bg-slate-800 border border-slate-700 p-4 rounded-xl flex flex-wrap gap-4 items-center justify-between">
+                <div class="flex flex-wrap items-center gap-3 flex-1">
+                    <div class="relative flex-1 min-w-[200px]">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+                        <input type="text" id="gallery-search" oninput="filterGallery()" placeholder="Buscar por título o descripción..." class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:border-emerald-500">
+                    </div>
+                    <select id="gallery-category-filter" onchange="filterGallery()" class="bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm outline-none focus:border-emerald-500">
+                        <option value="ALL">Todas las Categorías</option>
+                    </select>
+                </div>
+                <button type="button" onclick="resetGalleryFilters()" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-lg">Limpiar Filtros</button>
+            </div>
+
+            <div id="gallery-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
+        </section>
+    </div>
+
+    <!-- MODALES DE LA APLICACIÓN -->
+    <div id="gallery-modal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full">
+            <h3 class="text-lg font-bold mb-4 text-emerald-400 flex items-center gap-2"><i class="fa-solid fa-upload"></i> Subir Foto de Proceso</h3>
+            <form onsubmit="saveGalleryItem(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Título</label>
+                    <input type="text" id="img-title" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Categoría</label>
+                    <input type="text" id="img-category" placeholder="Ej: Línea SMT, Inspección, Calidad" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Descripción</label>
+                    <textarea id="img-description" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:border-emerald-500" placeholder="Detalles de la foto o línea de proceso..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Seleccionar Imagen</label>
+                    <input type="file" id="img-file" accept="image/*" required class="w-full text-xs text-slate-400 bg-slate-900 border border-slate-700 rounded-lg p-2">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeGalleryModal()" class="px-4 py-2 bg-slate-700 rounded-lg text-sm">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-semibold">Subir Imagen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="image-viewer-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-3xl w-full max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3 mb-4">
+                <h3 id="viewer-title" class="text-lg font-bold text-white"></h3>
+                <button type="button" onclick="closeImageViewer()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto space-y-4">
+                <div class="w-full flex justify-center bg-slate-900 p-2 rounded-lg border border-slate-700">
+                    <img id="viewer-img" class="max-h-96 object-contain rounded" src="" alt="">
+                </div>
+                <div>
+                    <span id="viewer-category" class="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded font-bold"></span>
+                    <p id="viewer-description" class="text-sm text-slate-300 mt-2"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ACTIVIDADES / WI PLAN COMPARTIDO -->
+    <div id="task-modal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full">
+            <h3 id="modal-task-title" class="text-lg font-bold mb-4">Nueva Actividad</h3>
+            <form onsubmit="saveTask(event)" class="space-y-4">
+                <input type="hidden" id="task-id">
+                <input type="hidden" id="task-type" value="activities">
+                <div><label class="block text-xs uppercase font-bold text-slate-400 mb-1">Título</label><input type="text" id="task-title" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none"></div>
+                <div><label class="block text-xs uppercase font-bold text-slate-400 mb-1">Responsable</label><select id="task-assigned" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none"></select></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-xs uppercase font-bold text-slate-400 mb-1">Inicio</label><input type="date" id="task-start" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none"></div>
+                    <div><label class="block text-xs uppercase font-bold text-slate-400 mb-1">Fin</label><input type="date" id="task-end" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-xs uppercase font-bold text-slate-400 mb-1">Avance (%)</label><input type="number" id="task-progress" min="0" max="100" value="0" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none"></div>
+                    <div><label class="block text-xs uppercase font-bold text-slate-400 mb-1">Estado</label>
+                        <select id="task-status" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none">
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="En Proceso">En Proceso</option>
+                            <option value="Completado">Completado</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeTaskModal()" class="px-4 py-2 bg-slate-700 rounded-lg text-sm">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL DETALLES Y COMENTARIOS COMPARTIDO -->
+    <div id="details-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3 mb-4">
+                <div>
+                    <h3 id="details-title" class="text-xl font-bold text-blue-400">Título del Registro</h3>
+                    <p id="details-subtitle" class="text-xs text-slate-400 mt-1"></p>
+                </div>
+                <button type="button" onclick="closeDetailsModal()" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto space-y-6 pr-2">
+                <div class="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+                    <h4 class="font-bold text-sm mb-3 text-slate-300 flex items-center gap-2"><i class="fa-solid fa-comments text-purple-400"></i> Comentarios y Archivos</h4>
+                    
+                    <div id="comments-container" class="space-y-2 max-h-48 overflow-y-auto pr-1 mb-4"></div>
+                    
+                    <div id="attachments-container" class="space-y-2 mb-4 border-t border-slate-700/60 pt-3"></div>
+                    
+                    <!-- Botón Unificado para Comentarios y Archivos directos desde PC con Previsualización -->
+                    <div class="space-y-3 pt-2 bg-slate-800/80 p-3 rounded-lg border border-slate-700">
+                        <textarea id="unified-comment-text" rows="2" placeholder="Escribe un comentario..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:border-blue-500"></textarea>
+                        
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                <label for="unified-file-input" class="cursor-pointer bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all">
+                                    <i class="fa-solid fa-paperclip text-cyan-400"></i> Adjuntar desde PC
+                                </label>
+                                <input type="file" id="unified-file-input" class="hidden" onchange="previewSelectedFile(event)">
+                                <span id="unified-file-name" class="text-xs text-cyan-300 italic truncate max-w-[180px]"></span>
+                            </div>
+                            
+                            <button type="button" onclick="saveUnifiedCommentAndFile()" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg">
+                                <i class="fa-solid fa-paper-plane"></i> Guardar Comentario / Adjunto
+                            </button>
+                        </div>
+                        
+                        <!-- Previsualizador de Documento/Archivo Seleccionado Integrado -->
+                        <div id="file-preview-box" class="hidden mt-2 p-2 bg-slate-900 rounded border border-cyan-500/40 text-xs space-y-2">
+                            <div class="flex justify-between items-center text-cyan-400 font-bold border-b border-slate-800 pb-1">
+                                <span><i class="fa-solid fa-eye mr-1"></i> Previsualización en el mismo modal</span>
+                                <button type="button" onclick="clearSelectedFile()" class="text-red-400 hover:text-red-300">✕</button>
+                            </div>
+                            <div id="file-preview-content" class="flex justify-center items-center max-h-60 overflow-auto"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL VISOR GENERAL DE PREVISUALIZACIÓN DE ADJUNTOS -->
+    <div id="doc-preview-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3 mb-4">
+                <h3 id="doc-preview-title" class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-file-pdf text-red-400"></i> Previsualización de Documento
+                </h3>
+                <button type="button" onclick="closeDocPreviewModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div id="doc-preview-body" class="flex-1 bg-slate-900 rounded-lg p-2 border border-slate-700 flex items-center justify-center overflow-auto min-h-[350px]">
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL USUARIOS INSCRITOS -->
+    <div id="users-list-modal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-5">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-4">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 bg-cyan-600/20 text-cyan-400 rounded-xl border border-cyan-500/30">
+                        <i class="fa-solid fa-users text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Gestión de Usuarios</h3>
+                        <p class="text-xs text-slate-400">Directorio de personal registrado en el sistema</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeUsersListModal()" class="text-slate-400 hover:text-white transition-all">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <div class="flex items-center gap-3 bg-slate-900/80 p-2 rounded-xl border border-slate-700">
+                <div class="relative flex-1">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                    <input type="text" id="user-search-input" oninput="filterUsersList()" placeholder="Buscar usuario..." class="w-full bg-slate-800 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-100 outline-none focus:border-cyan-500 transition-all">
+                </div>
+                <button type="button" onclick="openUserModal()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow transition-all">
+                    <i class="fa-solid fa-user-plus"></i> Nuevo
+                </button>
+            </div>
+
+            <div class="overflow-hidden border border-slate-700/80 rounded-xl max-h-72 overflow-y-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-900/90 text-slate-400 font-bold uppercase sticky top-0 border-b border-slate-700">
+                        <tr>
+                            <th class="p-3">ID</th>
+                            <th class="p-3">Usuario</th>
+                            <th class="p-3">Rol / Estado</th>
+                            <th class="p-3 text-right">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-table-body" class="divide-y divide-slate-700/60 bg-slate-800/40"></tbody>
+                </table>
+            </div>
+
+            <div class="flex justify-between items-center pt-2">
+                <span id="users-count-badge" class="text-xs text-slate-400 font-medium">0 usuarios en total</span>
+                <button type="button" onclick="closeUsersListModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold rounded-lg transition-all">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL CAMBIAR CONTRASEÑA -->
+    <div id="change-pass-modal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-sm w-full">
+            <h3 class="text-lg font-bold mb-4 text-amber-400 flex items-center gap-2"><i class="fa-solid fa-key"></i> Cambiar Contraseña</h3>
+            <form onsubmit="handleChangePassword(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Nueva Contraseña</label>
+                    <input type="password" id="new-user-pass" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:border-amber-500">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Confirmar Nueva Contraseña</label>
+                    <input type="password" id="confirm-user-pass" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:border-amber-500">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeChangePasswordModal()" class="px-4 py-2 bg-slate-700 rounded-lg text-sm">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-sm font-semibold">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="user-modal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 class="text-lg font-bold mb-4 text-white flex items-center gap-2"><i class="fa-solid fa-user-plus text-cyan-400"></i> Agregar Nuevo Usuario</h3>
+            <form onsubmit="saveUser(event)" class="space-y-4">
+                <div><label class="block text-xs uppercase font-bold text-slate-400 mb-1">Nombre Usuario</label><input type="text" id="new-username" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:border-cyan-500"></div>
+                <div><label class="block text-xs uppercase font-bold text-slate-400 mb-1">Contraseña</label><input type="password" id="new-password" required class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm outline-none focus:border-cyan-500"></div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeUserModal()" class="px-4 py-2 bg-slate-700 rounded-lg text-sm">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-semibold">Crear</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- SCRIPT PRINCIPAL CON TODAS LAS FUNCIONALIDADES PRESERVADAS Y ACTUALIZADAS -->
+    <script>
+        if (window.ChartDataLabels) {
+            Chart.register(ChartDataLabels);
+        }
+
+        const TURSO_URL = "https://turnob-ingdanielmtz.aws-us-west-2.turso.io";
+        const TURSO_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODU4NzczMDEsImlkIjoiMDE5Zjk0ZDAtZWIwMS03YzllLTg0YTItYTZlNDAxZjI3NzJiIiwia2lkIjoiaUpnZlN5MUJMMjQteGltcmRtdUwzUWlZR1hzeTF1WVJDelB0OXdVY1lOOCIsInJpZCI6ImY0OTA1YWMyLWIyZTYtNGY3Ny1iYzBjLTY4ZTI2YmYyZGYwMiJ9.hAM1Eypbh2U0cEm6ayoobph5_185zgO_zPBhx7h97XI8-ZYM5DHhVQqMKgIwInBt-KUeGzus1yNliykQmKTeDA";
+
+        let currentUser = null;
+        let globalTasks = [];
+        let globalWiTasks = [];
+        let globalUsers = [];
+        let rawUsersList = [];
+        let globalGallery = [];
+        let globalDocControl = [];
+
+        let chartUsersInstance = null;
+        let chartStatusInstance = null;
+        let wiChartUsersInstance = null;
+        let wiChartStatusInstance = null;
+
+        let ganttInstance = null;
+        let wiGanttInstance = null;
+
+        let activeTaskIdForDetails = null;
+        let activeTaskTypeForDetails = 'activities';
+        let selectedFileBase64 = null;
+        let selectedFileName = '';
+
+        let currentLoadedAttachments = [];
+
+        const STATUS_COLORS = {
+            'Pendiente': '#f59e0b',
+            'En Proceso': '#3b82f6',
+            'Completado': '#10b981'
+        };
+
+        // CLIENTE TURSO HTTP REST V2
+        async function tursoQuery(statements) {
+            const endpoint = `${TURSO_URL.replace(/\/$/, '')}/v2/pipeline`;
+            const formattedRequests = statements.map(stmt => {
+                if (typeof stmt === 'string') {
+                    return { type: "execute", stmt: { sql: stmt } };
+                } else {
+                    const args = (stmt.args || []).map(a => ({
+                        type: a.type || "text",
+                        value: String(a.value)
+                    }));
+                    return { type: "execute", stmt: { sql: stmt.sql, args: args } };
+                }
+            });
+
+            const requestsPayload = [
+                { type: "execute", stmt: { sql: "BEGIN TRANSACTION;" } },
+                ...formattedRequests,
+                { type: "execute", stmt: { sql: "COMMIT;" } },
+                { type: "close" }
+            ];
+
+            const response = await fetch(endpoint, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${TURSO_TOKEN}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ requests: requestsPayload })
+            });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`Turso HTTP Error: ${errText}`);
+            }
+
+            const data = await response.json();
+            return data.results.slice(1, -2);
+        }
+
+        async function initDB() {
+            try {
+                await tursoQuery([
+                    `CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL);`,
+                    `CREATE TABLE IF NOT EXISTS activities (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, assigned_to TEXT NOT NULL, start_date TEXT NOT NULL, end_date TEXT NOT NULL, progress INTEGER DEFAULT 0, status TEXT DEFAULT 'Pendiente');`,
+                    `CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, activity_id INTEGER NOT NULL, author TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL);`,
+                    `CREATE TABLE IF NOT EXISTS attachments (id INTEGER PRIMARY KEY AUTOINCREMENT, activity_id INTEGER NOT NULL, file_name TEXT NOT NULL, file_data TEXT NOT NULL, uploader TEXT);`,
+                    `CREATE TABLE IF NOT EXISTS wi_plan (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, assigned_to TEXT NOT NULL, start_date TEXT NOT NULL, end_date TEXT NOT NULL, progress INTEGER DEFAULT 0, status TEXT DEFAULT 'Pendiente');`,
+                    `CREATE TABLE IF NOT EXISTS wi_comments (id INTEGER PRIMARY KEY AUTOINCREMENT, activity_id INTEGER NOT NULL, author TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL);`,
+                    `CREATE TABLE IF NOT EXISTS wi_attachments (id INTEGER PRIMARY KEY AUTOINCREMENT, activity_id INTEGER NOT NULL, file_name TEXT NOT NULL, file_data TEXT NOT NULL, uploader TEXT);`,
+                    `CREATE TABLE IF NOT EXISTS process_gallery (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT, category TEXT NOT NULL, image_data TEXT NOT NULL, created_at TEXT NOT NULL);`,
+                    `CREATE TABLE IF NOT EXISTS doc_control (id INTEGER PRIMARY KEY AUTOINCREMENT, part_number TEXT NOT NULL, model TEXT NOT NULL, family TEXT NOT NULL, client TEXT NOT NULL, created_by TEXT, phase_actualizacion INTEGER DEFAULT 0, phase_en_control INTEGER DEFAULT 0, phase_controlado INTEGER DEFAULT 0, phase_esop INTEGER DEFAULT 0, last_modified_by TEXT, last_modified_at TEXT);`,
+                    `CREATE TABLE IF NOT EXISTS doc_control_comments (id INTEGER PRIMARY KEY AUTOINCREMENT, activity_id INTEGER NOT NULL, author TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL);`,
+                    `CREATE TABLE IF NOT EXISTS doc_control_attachments (id INTEGER PRIMARY KEY AUTOINCREMENT, activity_id INTEGER NOT NULL, file_name TEXT NOT NULL, file_data TEXT NOT NULL, uploader TEXT);`,
+                    { sql: "INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)", args: [{ type: "text", value: "Daniel Martinez" }, { type: "text", value: "Admin" }] },
+                    { sql: "INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)", args: [{ type: "text", value: "Daniel Moreno" }, { type: "text", value: "Admin" }] },
+                    { sql: "INSERT OR IGNORE INTO users (username, password) VALUES (?, ?)", args: [{ type: "text", value: "Ivan Leon" }, { type: "text", value: "Admin" }] }
+                ]);
+
+                try { await tursoQuery([`ALTER TABLE attachments ADD COLUMN uploader TEXT;`]); } catch(e){}
+                try { await tursoQuery([`ALTER TABLE wi_attachments ADD COLUMN uploader TEXT;`]); } catch(e){}
+                try { await tursoQuery([`ALTER TABLE doc_control ADD COLUMN created_by TEXT;`]); } catch(e){}
+
+            } catch (e) {
+                console.warn("Inicialización de tablas:", e.message);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const savedUser = localStorage.getItem('tracker_user');
+            if (savedUser) {
+                currentUser = savedUser;
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('app').classList.remove('hidden');
+                document.getElementById('user-display').innerText = `👤 ${currentUser}`;
+                await initDB();
+                showSection('main-menu');
+            }
+        });
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const user = document.getElementById('login-user').value.trim();
+            const pass = document.getElementById('login-pass').value.trim();
+
+            try {
+                await initDB();
+                const res = await tursoQuery([{
+                    sql: "SELECT * FROM users WHERE username = ? AND password = ?",
+                    args: [{ type: "text", value: user }, { type: "text", value: pass }]
+                }]);
+
+                const rows = res[0]?.response?.result?.rows || [];
+                if (rows.length > 0) {
+                    currentUser = rows[0][1].value;
+                    localStorage.setItem('tracker_user', currentUser);
+                    document.getElementById('login-screen').classList.add('hidden');
+                    document.getElementById('app').classList.remove('hidden');
+                    document.getElementById('user-display').innerText = `👤 ${currentUser}`;
+                    showSection('main-menu');
+                } else {
+                    alert("Usuario o contraseña incorrectos.");
+                }
+            } catch (err) {
+                alert("Error de conexión a Turso: " + err.message);
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            localStorage.removeItem('tracker_user');
+            document.getElementById('app').classList.add('hidden');
+            document.getElementById('login-screen').classList.remove('hidden');
+        }
+
+        function showSection(sectionId) {
+            document.getElementById('main-menu').classList.add('hidden');
+            document.getElementById('activities-module').classList.add('hidden');
+            document.getElementById('wi-plan-module').classList.add('hidden');
+            document.getElementById('doc-control-module').classList.add('hidden');
+            document.getElementById('gallery-module').classList.add('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('nav-btn-active'));
+            const topNav = document.getElementById('top-nav');
+
+            if (sectionId === 'main-menu') {
+                topNav.classList.add('hidden');
+                document.getElementById('main-menu').classList.remove('hidden');
+            } else if (sectionId === 'activities-module') {
+                topNav.classList.remove('hidden');
+                document.getElementById('activities-module').classList.remove('hidden');
+                document.getElementById('nav-btn-activities-module')?.classList.add('nav-btn-active');
+                loadDashboard('activities');
+            } else if (sectionId === 'wi-plan-module') {
+                topNav.classList.remove('hidden');
+                document.getElementById('wi-plan-module').classList.remove('hidden');
+                document.getElementById('nav-btn-wi-plan-module')?.classList.add('nav-btn-active');
+                loadDashboard('wi');
+            } else if (sectionId === 'doc-control-module') {
+                topNav.classList.remove('hidden');
+                document.getElementById('doc-control-module').classList.remove('hidden');
+                document.getElementById('nav-btn-doc-control-module')?.classList.add('nav-btn-active');
+                loadDocControl();
+            } else if (sectionId === 'gallery-module') {
+                topNav.classList.remove('hidden');
+                document.getElementById('gallery-module').classList.remove('hidden');
+                document.getElementById('nav-btn-gallery-module')?.classList.add('nav-btn-active');
+                loadGallery();
+            }
+        }
+
+        async function loadDashboard(type = 'activities') {
+            const isWi = type === 'wi';
+            const table = isWi ? 'wi_plan' : 'activities';
+
+            const res = await tursoQuery([
+                `SELECT * FROM ${table} ORDER BY id DESC;`,
+                `SELECT username FROM users ORDER BY username ASC;`
+            ]);
+
+            const rawTasks = res[0]?.response?.result?.rows || [];
+            const rawUsers = res[1]?.response?.result?.rows || [];
+
+            const tasksData = rawTasks.map(r => ({
+                id: Number(r[0].value),
+                title: r[1].value,
+                assigned_to: r[2].value,
+                start_date: r[3].value,
+                end_date: r[4].value,
+                progress: Number(r[5].value),
+                status: r[6].value
+            }));
+
+            const usersData = rawUsers.map(r => r[0].value);
+
+            if (isWi) {
+                globalWiTasks = tasksData;
+            } else {
+                globalTasks = tasksData;
+            }
+            globalUsers = usersData;
+
+            populateUserDropdowns(type);
+            renderMetrics(type);
+            renderExpiringTable(type);
+            renderTable(tasksData, type);
+            renderCharts(tasksData, type);
+            renderGantt(tasksData, type);
+        }
+
+        function populateUserDropdowns(type = 'activities') {
+            const filterId = type === 'wi' ? 'wi-user-filter' : 'task-user-filter';
+            const selectFilter = document.getElementById(filterId);
+            const taskAssignedSelect = document.getElementById('task-assigned');
+
+            if (selectFilter) {
+                selectFilter.innerHTML = '<option value="ALL">Todos los Responsables</option>';
+                globalUsers.forEach(u => {
+                    selectFilter.innerHTML += `<option value="${u}">${u}</option>`;
+                });
+            }
+
+            if (taskAssignedSelect) {
+                taskAssignedSelect.innerHTML = '';
+                globalUsers.forEach(u => {
+                    taskAssignedSelect.innerHTML += `<option value="${u}">${u}</option>`;
+                });
+            }
+        }
+
+        function renderMetrics(type = 'activities', dataOverride = null) {
+            const isWi = type === 'wi';
+            const tasks = dataOverride || (isWi ? globalWiTasks : globalTasks);
+
+            const total = tasks.length;
+            const completed = tasks.filter(t => t.status === 'Completado').length;
+            const activeUsers = new Set(tasks.map(t => t.assigned_to)).size;
+
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const threeDaysLater = new Date(today);
+            threeDaysLater.setDate(today.getDate() + 3);
+
+            const expiring = tasks.filter(t => {
+                if (t.status === 'Completado') return false;
+                const end = new Date(t.end_date);
+                end.setHours(0,0,0,0);
+                return end >= today && end <= threeDaysLater;
+            }).length;
+
+            const prefix = isWi ? 'wi-metric-' : 'metric-';
+            document.getElementById(`${prefix}total`).innerText = total;
+            document.getElementById(`${prefix}expiring`).innerText = expiring;
+            document.getElementById(`${prefix}completed`).innerText = completed;
+            document.getElementById(`${prefix}users`).innerText = activeUsers;
+        }
+
+        function renderExpiringTable(type = 'activities') {
+            const isWi = type === 'wi';
+            const tasks = isWi ? globalWiTasks : globalTasks;
+            const bodyId = isWi ? 'wi-expiring-table-body' : 'expiring-table-body';
+            const body = document.getElementById(bodyId);
+
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const threeDaysLater = new Date(today);
+            threeDaysLater.setDate(today.getDate() + 3);
+
+            const expiringTasks = tasks.filter(t => {
+                if (t.status === 'Completado') return false;
+                const end = new Date(t.end_date);
+                end.setHours(0,0,0,0);
+                return end >= today && end <= threeDaysLater;
+            });
+
+            if (expiringTasks.length === 0) {
+                body.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-xs text-slate-500 italic">Sin tareas próximas a vencer en los siguientes 3 días.</td></tr>`;
+                return;
+            }
+
+            body.innerHTML = expiringTasks.map(t => `
+                <tr class="hover:bg-slate-700/30 text-xs">
+                    <td class="p-3 font-semibold text-white">${t.title}</td>
+                    <td class="p-3 text-slate-300">${t.assigned_to}</td>
+                    <td class="p-3 text-amber-400 font-bold">${t.end_date}</td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold" style="background:${STATUS_COLORS[t.status]}33; color:${STATUS_COLORS[t.status]}">${t.status}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        function renderTable(data, type = 'activities') {
+            const isWi = type === 'wi';
+            const bodyId = isWi ? 'wi-table-body' : 'tasks-table-body';
+            const body = document.getElementById(bodyId);
+
+            if (data.length === 0) {
+                body.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-xs text-slate-500 italic">No hay registros cargados.</td></tr>`;
+                return;
+            }
+
+            body.innerHTML = data.map(t => `
+                <tr class="hover:bg-slate-800/80 transition-all text-xs">
+                    <td class="p-3 font-mono text-slate-400">#${t.id}</td>
+                    <td class="p-3 font-semibold text-white">${t.title}</td>
+                    <td class="p-3 text-slate-300">${t.assigned_to}</td>
+                    <td class="p-3 text-slate-400">${t.start_date}</td>
+                    <td class="p-3 text-slate-400">${t.end_date}</td>
+                    <td class="p-3">
+                        <div class="w-full bg-slate-700 rounded-full h-2 max-w-[80px]">
+                            <div class="bg-blue-500 h-2 rounded-full" style="width: ${t.progress}%"></div>
+                        </div>
+                        <span class="text-[10px] text-slate-400">${t.progress}%</span>
+                    </td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold" style="background:${STATUS_COLORS[t.status]}33; color:${STATUS_COLORS[t.status]}">${t.status}</span></td>
+                    <td class="p-3 text-right space-x-2">
+                        <button onclick="openDetailsModal(${t.id}, '${type}')" class="text-purple-400 hover:text-purple-300 p-1" title="Ver Detalles/Adjuntos"><i class="fa-solid fa-comments"></i></button>
+                        <button onclick="openTaskModal(${t.id}, '${type}')" class="text-blue-400 hover:text-blue-300 p-1"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button onclick="deleteTask(${t.id}, '${type}')" class="text-red-400 hover:text-red-300 p-1"><i class="fa-solid fa-trash-can"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function filterTasks() {
+            const query = document.getElementById('task-search-input').value.toLowerCase();
+            const status = document.getElementById('task-status-filter').value;
+            const user = document.getElementById('task-user-filter').value;
+
+            const filtered = globalTasks.filter(t => {
+                const matchQuery = t.title.toLowerCase().includes(query);
+                const matchStatus = status === 'ALL' || t.status === status;
+                const matchUser = user === 'ALL' || t.assigned_to === user;
+                return matchQuery && matchStatus && matchUser;
+            });
+
+            renderTable(filtered, 'activities');
+            renderCharts(filtered, 'activities');
+            renderMetrics('activities', filtered);
+            renderGantt(filtered, 'activities');
+        }
+
+        function resetTaskFilters() {
+            document.getElementById('task-search-input').value = '';
+            document.getElementById('task-status-filter').value = 'ALL';
+            document.getElementById('task-user-filter').value = 'ALL';
+            renderTable(globalTasks, 'activities');
+            renderCharts(globalTasks, 'activities');
+            renderMetrics('activities', globalTasks);
+            renderGantt(globalTasks, 'activities');
+        }
+
+        function filterWiTasks() {
+            const query = document.getElementById('wi-search-input').value.toLowerCase();
+            const status = document.getElementById('wi-status-filter').value;
+            const user = document.getElementById('wi-user-filter').value;
+
+            const filtered = globalWiTasks.filter(t => {
+                const matchQuery = t.title.toLowerCase().includes(query);
+                const matchStatus = status === 'ALL' || t.status === status;
+                const matchUser = user === 'ALL' || t.assigned_to === user;
+                return matchQuery && matchStatus && matchUser;
+            });
+
+            renderTable(filtered, 'wi');
+            renderCharts(filtered, 'wi');
+            renderMetrics('wi', filtered);
+            renderGantt(filtered, 'wi');
+        }
+
+        function resetWiFilters() {
+            document.getElementById('wi-search-input').value = '';
+            document.getElementById('wi-status-filter').value = 'ALL';
+            document.getElementById('wi-user-filter').value = 'ALL';
+            renderTable(globalWiTasks, 'wi');
+            renderCharts(globalWiTasks, 'wi');
+            renderMetrics('wi', globalWiTasks);
+            renderGantt(globalWiTasks, 'wi');
+        }
+
+        function renderCharts(data, type = 'activities') {
+            const isWi = type === 'wi';
+
+            const users = Array.from(new Set(data.map(t => t.assigned_to)));
+            const statuses = ['Pendiente', 'En Proceso', 'Completado'];
+
+            const datasetsBar = statuses.map(st => {
+                return {
+                    label: st,
+                    data: users.map(u => data.filter(t => t.assigned_to === u && t.status === st).length),
+                    backgroundColor: STATUS_COLORS[st],
+                    borderRadius: 4
+                };
+            });
+
+            const statusCounts = { 'Pendiente': 0, 'En Proceso': 0, 'Completado': 0 };
+            data.forEach(t => {
+                if (statusCounts[t.status] !== undefined) {
+                    statusCounts[t.status]++;
+                }
+            });
+
+            const chartUsersCanvas = document.getElementById(isWi ? 'wiChartUsers' : 'chartUsers');
+            const chartStatusCanvas = document.getElementById(isWi ? 'wiChartStatus' : 'chartStatus');
+
+            if (isWi) {
+                if (wiChartUsersInstance) wiChartUsersInstance.destroy();
+                if (wiChartStatusInstance) wiChartStatusInstance.destroy();
+            } else {
+                if (chartUsersInstance) chartUsersInstance.destroy();
+                if (chartStatusInstance) chartStatusInstance.destroy();
+            }
+
+            const usersChart = new Chart(chartUsersCanvas, {
+                type: 'bar',
+                data: {
+                    labels: users,
+                    datasets: datasetsBar
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { labels: { color: '#94a3b8' } },
+                        datalabels: {
+                            display: function(context) {
+                                return context.dataset.data[context.dataIndex] > 0;
+                            },
+                            color: '#ffffff',
+                            font: { weight: 'bold', size: 11 },
+                            formatter: function(value) {
+                                return value;
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { stacked: true, ticks: { color: '#94a3b8' }, grid: { display: false } },
+                        y: { stacked: true, ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+                    }
+                }
+            });
+
+            const statusChart = new Chart(chartStatusCanvas, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(statusCounts),
+                    datasets: [{
+                        data: Object.values(statusCounts),
+                        backgroundColor: ['#f59e0b', '#3b82f6', '#10b981']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { labels: { color: '#ffffff' } },
+                        datalabels: {
+                            color: '#ffffff',
+                            font: { weight: 'bold' },
+                            formatter: (value, ctx) => {
+                                let sum = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                if (sum === 0) return '0%';
+                                let percentage = (value * 100 / sum).toFixed(1) + "%";
+                                return percentage;
+                            }
+                        }
+                    }
+                }
+            });
+
+            if (isWi) {
+                wiChartUsersInstance = usersChart;
+                wiChartStatusInstance = statusChart;
+            } else {
+                chartUsersInstance = usersChart;
+                chartStatusInstance = statusChart;
+            }
+        }
+
+        function renderGantt(data, type = 'activities') {
+            const isWi = type === 'wi';
+            const containerId = isWi ? 'wi-gantt-container' : 'gantt-container';
+            const container = document.getElementById(containerId);
+
+            if (data.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-500 italic p-4">No hay tareas para mostrar en el diagrama de Gantt.</p>`;
+                return;
+            }
+
+            const ganttTasks = data.map(t => ({
+                id: String(t.id),
+                name: `${t.title} (${t.assigned_to})`,
+                start: t.start_date,
+                end: t.end_date,
+                progress: t.progress,
+                dependencies: ''
+            }));
+
+            container.innerHTML = '';
+            const ganttObj = new Gantt(`#${containerId}`, ganttTasks, {
+                header_height: 50,
+                column_width: 30,
+                step: 24,
+                view_modes: ['Day', 'Week', 'Month'],
+                bar_height: 20,
+                bar_corner_radius: 3,
+                arrow_curve: 5,
+                padding: 18,
+                view_mode: 'Day',
+                date_format: 'YYYY-MM-DD',
+                on_double_click: task => {
+                    openDetailsModal(Number(task.id), type);
+                }
+            });
+
+            if (isWi) wiGanttInstance = ganttObj;
+            else ganttInstance = ganttObj;
+        }
+
+        function changeGanttView(mode, type = 'activities') {
+            const instance = type === 'wi' ? wiGanttInstance : ganttInstance;
+            if (instance) instance.change_view_mode(mode);
+        }
+
+        function openTaskModal(id = null, type = 'activities') {
+            document.getElementById('task-type').value = type;
+            const isWi = type === 'wi';
+            const tasks = isWi ? globalWiTasks : globalTasks;
+
+            document.getElementById('modal-task-title').innerText = id ? `Editar ${isWi ? 'WI Plan' : 'Actividad'}` : `Nueva ${isWi ? 'WI Plan' : 'Actividad'}`;
+            document.getElementById('task-id').value = id || '';
+
+            populateUserDropdowns(type);
+
+            if (id) {
+                const task = tasks.find(t => t.id === id);
+                if (task) {
+                    document.getElementById('task-title').value = task.title;
+                    document.getElementById('task-assigned').value = task.assigned_to;
+                    document.getElementById('task-start').value = task.start_date;
+                    document.getElementById('task-end').value = task.end_date;
+                    document.getElementById('task-progress').value = task.progress;
+                    document.getElementById('task-status').value = task.status;
+                }
+            } else {
+                document.getElementById('task-title').value = '';
+                document.getElementById('task-start').value = new Date().toISOString().split('T')[0];
+                document.getElementById('task-end').value = new Date().toISOString().split('T')[0];
+                document.getElementById('task-progress').value = '0';
+                document.getElementById('task-status').value = 'Pendiente';
+            }
+
+            document.getElementById('task-modal').classList.remove('hidden');
+        }
+
+        function openWiTaskModal(id = null) {
+            openTaskModal(id, 'wi');
+        }
+
+        function closeTaskModal() {
+            document.getElementById('task-modal').classList.add('hidden');
+        }
+
+        async function saveTask(e) {
+            e.preventDefault();
+            const type = document.getElementById('task-type').value;
+            const isWi = type === 'wi';
+            const table = isWi ? 'wi_plan' : 'activities';
+
+            const id = document.getElementById('task-id').value;
+            const title = document.getElementById('task-title').value.trim();
+            const assigned = document.getElementById('task-assigned').value;
+            const start = document.getElementById('task-start').value;
+            const end = document.getElementById('task-end').value;
+            const progress = parseInt(document.getElementById('task-progress').value) || 0;
+            const status = document.getElementById('task-status').value;
+
+            try {
+                if (id) {
+                    await tursoQuery([{
+                        sql: `UPDATE ${table} SET title=?, assigned_to=?, start_date=?, end_date=?, progress=?, status=? WHERE id=?`,
+                        args: [
+                            { type: "text", value: title },
+                            { type: "text", value: assigned },
+                            { type: "text", value: start },
+                            { type: "text", value: end },
+                            { type: "integer", value: progress },
+                            { type: "text", value: status },
+                            { type: "integer", value: Number(id) }
+                        ]
+                    }]);
+                } else {
+                    await tursoQuery([{
+                        sql: `INSERT INTO ${table} (title, assigned_to, start_date, end_date, progress, status) VALUES (?, ?, ?, ?, ?, ?)`,
+                        args: [
+                            { type: "text", value: title },
+                            { type: "text", value: assigned },
+                            { type: "text", value: start },
+                            { type: "text", value: end },
+                            { type: "integer", value: progress },
+                            { type: "text", value: status }
+                        ]
+                    }]);
+                }
+
+                closeTaskModal();
+                await loadDashboard(type);
+
+            } catch (err) {
+                alert("Error al guardar: " + err.message);
+            }
+        }
+
+        async function deleteTask(id, type = 'activities') {
+            if (!confirm("¿Está seguro de eliminar este registro?")) return;
+            const isWi = type === 'wi';
+            const table = isWi ? 'wi_plan' : 'activities';
+
+            try {
+                await tursoQuery([`DELETE FROM ${table} WHERE id=${id}`]);
+                await loadDashboard(type);
+            } catch (err) {
+                alert("Error al eliminar: " + err.message);
+            }
+        }
+
+        // CONTROL DE DOCUMENTOS: FUNCIONES DE LECTURA, EDICIÓN Y ORIGINADOR
+        async function loadDocControl() {
+            try {
+                const res = await tursoQuery([`SELECT id, part_number, model, family, client, created_by, phase_actualizacion, phase_en_control, phase_controlado, phase_esop, last_modified_by, last_modified_at FROM doc_control ORDER BY id DESC;`]);
+                const rows = res[0]?.response?.result?.rows || [];
+
+                globalDocControl = rows.map(r => ({
+                    id: Number(r[0].value),
+                    partNumber: r[1].value,
+                    model: r[2].value,
+                    family: r[3].value,
+                    client: r[4].value,
+                    createdBy: r[5]?.value || currentUser || 'Daniel Martínez',
+                    phaseActualizacion: Number(r[6].value) === 1,
+                    phaseEnControl: Number(r[7].value) === 1,
+                    phaseControlado: Number(r[8].value) === 1,
+                    phaseEsop: Number(r[9].value) === 1,
+                    lastModifiedBy: r[10]?.value || 'Sistema',
+                    lastModifiedAt: r[11]?.value || ''
+                }));
+
+                if (globalDocControl.length === 0) {
+                    globalDocControl = [
+                        { id: 'new_1', partNumber: 'PN-100234', model: 'INV-M1', family: 'SMT-A', client: 'Inventec Corp', createdBy: currentUser || 'Daniel Martínez', phaseActualizacion: true, phaseEnControl: true, phaseControlado: false, phaseEsop: false, lastModifiedBy: currentUser || 'Admin', lastModifiedAt: new Date().toLocaleString() }
+                    ];
+                }
+
+                renderDocControlTable(globalDocControl);
+                renderDocControlMetrics(globalDocControl);
+            } catch (e) {
+                console.error("Error al cargar Control de Documentos:", e);
+            }
+        }
+
+        function renderDocControlMetrics(data) {
+            const total = data.length;
+            const updating = data.filter(d => d.phaseActualizacion && !d.phaseEsop).length;
+            const inControl = data.filter(d => d.phaseEnControl && !d.phaseEsop).length;
+            const completed = data.filter(d => d.phaseEsop).length;
+
+            document.getElementById('doc-metric-total').innerText = total;
+            document.getElementById('doc-metric-updating').innerText = updating;
+            document.getElementById('doc-metric-in-control').innerText = inControl;
+            document.getElementById('doc-metric-completed').innerText = completed;
+        }
+
+        function renderDocControlTable(data) {
+            const body = document.getElementById('doc-control-body');
+            if (!body) return;
+
+            if (data.length === 0) {
+                body.innerHTML = `<tr><td colspan="12" class="p-4 text-center text-xs text-slate-500 italic">No hay documentos registrados. Utiliza el botón "Agregar Documento" arriba.</td></tr>`;
+                return;
+            }
+
+            body.innerHTML = data.map((doc, idx) => {
+                const phasesCount = (doc.phaseActualizacion ? 1 : 0) + (doc.phaseEnControl ? 1 : 0) + (doc.phaseControlado ? 1 : 0) + (doc.phaseEsop ? 1 : 0);
+                const percent = Math.round((phasesCount / 4) * 100);
+
+                let progressBg = 'bg-amber-500';
+                if (percent >= 100) progressBg = 'bg-emerald-500';
+                else if (percent >= 50) progressBg = 'bg-cyan-500';
+
+                return `
+                    <tr class="hover:bg-slate-800/80 transition-all border-b border-slate-700/60">
+                        <td class="p-1"><input type="text" value="${doc.partNumber}" onchange="updateDocField(${idx}, 'partNumber', this.value)" class="doc-input font-mono font-bold text-cyan-300" placeholder="N° Parte"></td>
+                        <td class="p-1"><input type="text" value="${doc.model}" onchange="updateDocField(${idx}, 'model', this.value)" class="doc-input" placeholder="Modelo"></td>
+                        <td class="p-1"><input type="text" value="${doc.family}" onchange="updateDocField(${idx}, 'family', this.value)" class="doc-input" placeholder="Familia"></td>
+                        <td class="p-1"><input type="text" value="${doc.client}" onchange="updateDocField(${idx}, 'client', this.value)" class="doc-input" placeholder="Cliente"></td>
+                        <td class="p-1"><input type="text" value="${doc.createdBy || ''}" onchange="updateDocField(${idx}, 'createdBy', this.value)" class="doc-input text-amber-200 font-semibold" placeholder="Originador"></td>
+                        <td class="p-1 text-center bg-amber-950/20">
+                            <input type="checkbox" ${doc.phaseActualizacion ? 'checked' : ''} onchange="toggleDocPhase(${idx}, 'phaseActualizacion', this.checked)" class="doc-checkbox">
+                        </td>
+                        <td class="p-1 text-center bg-blue-950/20">
+                            <input type="checkbox" ${doc.phaseEnControl ? 'checked' : ''} onchange="toggleDocPhase(${idx}, 'phaseEnControl', this.checked)" class="doc-checkbox">
+                        </td>
+                        <td class="p-1 text-center bg-indigo-950/20">
+                            <input type="checkbox" ${doc.phaseControlado ? 'checked' : ''} onchange="toggleDocPhase(${idx}, 'phaseControlado', this.checked)" class="doc-checkbox">
+                        </td>
+                        <td class="p-1 text-center bg-emerald-950/20">
+                            <input type="checkbox" ${doc.phaseEsop ? 'checked' : ''} onchange="toggleDocPhase(${idx}, 'phaseEsop', this.checked)" class="doc-checkbox">
+                        </td>
+                        <td class="p-2 min-w-[120px]">
+                            <div class="flex items-center gap-2">
+                                <div class="flex-1 bg-slate-700 rounded-full h-2.5 overflow-hidden border border-slate-600">
+                                    <div class="${progressBg} h-2.5 rounded-full transition-all duration-300" style="width: ${percent}%"></div>
+                                </div>
+                                <span class="text-[11px] font-bold ${percent === 100 ? 'text-emerald-400' : 'text-slate-300'} min-w-[32px] text-right">${percent}%</span>
+                            </div>
+                        </td>
+                        <td class="p-2 text-[11px] text-slate-400 font-mono text-center">
+                            <i class="fa-solid fa-clock-rotate-left mr-1 text-cyan-400"></i> ${doc.lastModifiedBy || 'Sistema'}<br>
+                            <span class="text-[10px] text-slate-500">${doc.lastModifiedAt || ''}</span>
+                        </td>
+                        <td class="p-2 text-center space-x-1">
+                            <button type="button" onclick="openDetailsModal(${doc.id}, 'doc')" class="text-purple-400 hover:text-purple-300 p-1.5 rounded hover:bg-slate-700" title="Comentarios y Adjuntos"><i class="fa-solid fa-comments"></i></button>
+                            <button type="button" onclick="deleteDocRow(${idx})" class="text-red-400 hover:text-red-300 p-1.5 rounded hover:bg-slate-700" title="Eliminar Documento"><i class="fa-solid fa-trash-can"></i></button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updateDocField(idx, field, val) {
+            if (globalDocControl[idx]) {
+                globalDocControl[idx][field] = val;
+                globalDocControl[idx].lastModifiedBy = currentUser || 'Admin';
+                globalDocControl[idx].lastModifiedAt = new Date().toLocaleString();
+            }
+        }
+
+        function toggleDocPhase(idx, phaseField, isChecked) {
+            if (globalDocControl[idx]) {
+                globalDocControl[idx][phaseField] = isChecked;
+                globalDocControl[idx].lastModifiedBy = currentUser || 'Admin';
+                globalDocControl[idx].lastModifiedAt = new Date().toLocaleString();
+                renderDocControlTable(globalDocControl);
+                renderDocControlMetrics(globalDocControl);
+            }
+        }
+
+        function addNewDocRow() {
+            globalDocControl.unshift({
+                id: 'new_' + Date.now(),
+                partNumber: 'NUEVO-PN',
+                model: 'MODELO',
+                family: 'FAMILIA',
+                client: 'CLIENTE',
+                createdBy: currentUser || 'Daniel Martínez',
+                phaseActualizacion: false,
+                phaseEnControl: false,
+                phaseControlado: false,
+                phaseEsop: false,
+                lastModifiedBy: currentUser || 'Admin',
+                lastModifiedAt: new Date().toLocaleString()
+            });
+            renderDocControlTable(globalDocControl);
+            renderDocControlMetrics(globalDocControl);
+        }
+
+        async function deleteDocRow(idx) {
+            const doc = globalDocControl[idx];
+            if (!doc) return;
+            if (!confirm(`¿Está seguro de eliminar el documento ${doc.partNumber}?`)) return;
+
+            if (typeof doc.id === 'number') {
+                try {
+                    await tursoQuery([`DELETE FROM doc_control WHERE id=${doc.id};`]);
+                } catch(e) {
+                    alert("Error al eliminar de la base de datos: " + e.message);
+                }
+            }
+            globalDocControl.splice(idx, 1);
+            renderDocControlTable(globalDocControl);
+            renderDocControlMetrics(globalDocControl);
+        }
+
+        async function saveAllDocChanges() {
+            try {
+                const stmts = [];
+                for (const doc of globalDocControl) {
+                    const pAct = doc.phaseActualizacion ? 1 : 0;
+                    const pEnc = doc.phaseEnControl ? 1 : 0;
+                    const pCon = doc.phaseControlado ? 1 : 0;
+                    const pEsop = doc.phaseEsop ? 1 : 0;
+                    const modBy = currentUser || 'Admin';
+                    const modAt = new Date().toLocaleString();
+
+                    if (typeof doc.id === 'string' && doc.id.startsWith('new_')) {
+                        stmts.push({
+                            sql: `INSERT INTO doc_control (part_number, model, family, client, created_by, phase_actualizacion, phase_en_control, phase_controlado, phase_esop, last_modified_by, last_modified_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+                            args: [
+                                { type: "text", value: doc.partNumber },
+                                { type: "text", value: doc.model },
+                                { type: "text", value: doc.family },
+                                { type: "text", value: doc.client },
+                                { type: "text", value: doc.createdBy || currentUser || 'Daniel Martínez' },
+                                { type: "integer", value: pAct },
+                                { type: "integer", value: pEnc },
+                                { type: "integer", value: pCon },
+                                { type: "integer", value: pEsop },
+                                { type: "text", value: modBy },
+                                { type: "text", value: modAt }
+                            ]
+                        });
+                    } else {
+                        stmts.push({
+                            sql: `UPDATE doc_control SET part_number=?, model=?, family=?, client=?, created_by=?, phase_actualizacion=?, phase_en_control=?, phase_controlado=?, phase_esop=?, last_modified_by=?, last_modified_at=? WHERE id=?;`,
+                            args: [
+                                { type: "text", value: doc.partNumber },
+                                { type: "text", value: doc.model },
+                                { type: "text", value: doc.family },
+                                { type: "text", value: doc.client },
+                                { type: "text", value: doc.createdBy || currentUser || 'Daniel Martínez' },
+                                { type: "integer", value: pAct },
+                                { type: "integer", value: pEnc },
+                                { type: "integer", value: pCon },
+                                { type: "integer", value: pEsop },
+                                { type: "text", value: modBy },
+                                { type: "text", value: modAt },
+                                { type: "integer", value: Number(doc.id) }
+                            ]
+                        });
+                    }
+                }
+
+                if (stmts.length > 0) {
+                    await tursoQuery(stmts);
+                    alert("¡Cambios de Control de Documentos guardados exitosamente!");
+                    await loadDocControl();
+                } else {
+                    alert("No hay cambios pendientes para guardar.");
+                }
+            } catch (err) {
+                alert("Error al guardar cambios de documentos: " + err.message);
+            }
+        }
+
+        function filterDocControlTable() {
+            const pSearch = (document.getElementById('doc-search-part')?.value || '').toLowerCase();
+            const cSearch = (document.getElementById('doc-search-client')?.value || '').toLowerCase();
+            const fSearch = (document.getElementById('doc-search-family')?.value || '').toLowerCase();
+
+            const filtered = globalDocControl.filter(d => {
+                const matchP = (d.partNumber || '').toLowerCase().includes(pSearch);
+                const matchC = (d.client || '').toLowerCase().includes(cSearch);
+                const matchF = (d.family || '').toLowerCase().includes(fSearch);
+                return matchP && matchC && matchF;
+            });
+
+            renderDocControlTable(filtered);
+            renderDocControlMetrics(filtered);
+        }
+
+        function resetDocSearchFilters() {
+            if (document.getElementById('doc-search-part')) document.getElementById('doc-search-part').value = '';
+            if (document.getElementById('doc-search-client')) document.getElementById('doc-search-client').value = '';
+            if (document.getElementById('doc-search-family')) document.getElementById('doc-search-family').value = '';
+            renderDocControlTable(globalDocControl);
+            renderDocControlMetrics(globalDocControl);
+        }
+
+        function exportDocControlExcel() {
+            const exportData = globalDocControl.map(d => ({
+                "N° Parte": d.partNumber,
+                "Modelo": d.model,
+                "Familia": d.family,
+                "Cliente": d.client,
+                "Originador": d.createdBy || '',
+                "Fase 1: Actualización": d.phaseActualizacion ? "SÍ" : "NO",
+                "Fase 2: En Control Doc.": d.phaseEnControl ? "SÍ" : "NO",
+                "Fase 3: Controlado": d.phaseControlado ? "SÍ" : "NO",
+                "Fase 4: ESOP": d.phaseEsop ? "SÍ" : "NO",
+                "Última Modificación Por": d.lastModifiedBy || '',
+                "Fecha Modificación": d.lastModifiedAt || ''
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Control_Documentos");
+            XLSX.writeFile(wb, `Control_Documentos_Inventec_${new Date().toISOString().split('T')[0]}.xlsx`);
+        }
+
+        // DETALLES, COMENTARIOS Y ADJUNTOS COMPARTIDOS
+        async function openDetailsModal(id, type = 'activities') {
+            activeTaskIdForDetails = id;
+            activeTaskTypeForDetails = type;
+
+            let titleText = `Registro #${id}`;
+            let subtitleText = '';
+
+            if (type === 'activities') {
+                const item = globalTasks.find(t => t.id === id);
+                if (item) {
+                    titleText = item.title;
+                    subtitleText = `Asignado a: ${item.assigned_to} | Inicio: ${item.start_date} | Fin: ${item.end_date}`;
+                }
+            } else if (type === 'wi') {
+                const item = globalWiTasks.find(t => t.id === id);
+                if (item) {
+                    titleText = item.title;
+                    subtitleText = `WI Plan | Asignado a: ${item.assigned_to} | Avance: ${item.progress}%`;
+                }
+            } else if (type === 'doc') {
+                const item = globalDocControl.find(d => d.id === id);
+                if (item) {
+                    titleText = `Documento N° Parte: ${item.partNumber}`;
+                    subtitleText = `Modelo: ${item.model} | Familia: ${item.family} | Cliente: ${item.client} | Originador: ${item.createdBy || 'No especificado'}`;
+                }
+            }
+
+            document.getElementById('details-title').innerText = titleText;
+            document.getElementById('details-subtitle').innerText = subtitleText;
+
+            clearSelectedFile();
+            document.getElementById('details-modal').classList.remove('hidden');
+            await loadCommentsAndAttachments();
+        }
+
+        function closeDetailsModal() {
+            document.getElementById('details-modal').classList.add('hidden');
+            activeTaskIdForDetails = null;
+            clearSelectedFile();
+        }
+
+        async function loadCommentsAndAttachments() {
+            if (!activeTaskIdForDetails) return;
+
+            const commTable = activeTaskTypeForDetails === 'wi' ? 'wi_comments' : (activeTaskTypeForDetails === 'doc' ? 'doc_control_comments' : 'comments');
+            const attTable = activeTaskTypeForDetails === 'wi' ? 'wi_attachments' : (activeTaskTypeForDetails === 'doc' ? 'doc_control_attachments' : 'attachments');
+
+            try {
+                const res = await tursoQuery([
+                    `SELECT id, author, text, created_at FROM ${commTable} WHERE activity_id=${activeTaskIdForDetails} ORDER BY id ASC;`,
+                    `SELECT id, file_name, file_data, uploader FROM ${attTable} WHERE activity_id=${activeTaskIdForDetails} ORDER BY id DESC;`
+                ]);
+
+                const comments = res[0]?.response?.result?.rows || [];
+                const attachments = res[1]?.response?.result?.rows || [];
+
+                currentLoadedAttachments = attachments.map(a => ({
+                    id: Number(a[0].value),
+                    fileName: a[1].value,
+                    fileData: a[2].value,
+                    uploader: a[3]?.value || 'Usuario'
+                }));
+
+                const commContainer = document.getElementById('comments-container');
+                if (comments.length === 0) {
+                    commContainer.innerHTML = `<p class="text-xs text-slate-500 italic">No hay comentarios registrados.</p>`;
+                } else {
+                    commContainer.innerHTML = comments.map(c => `
+                        <div class="bg-slate-800 p-2.5 rounded-lg border border-slate-700 text-xs">
+                            <div class="flex justify-between text-slate-400 font-semibold mb-1">
+                                <span><i class="fa-solid fa-user text-cyan-400 mr-1"></i>${c[1].value}</span>
+                                <span class="text-[10px]">${c[3].value}</span>
+                            </div>
+                            <p class="text-slate-200">${c[2].value}</p>
+                        </div>
+                    `).join('');
+                }
+
+                const attContainer = document.getElementById('attachments-container');
+                if (currentLoadedAttachments.length === 0) {
+                    attContainer.innerHTML = `<p class="text-xs text-slate-500 italic">No hay archivos adjuntos.</p>`;
+                } else {
+                    attContainer.innerHTML = currentLoadedAttachments.map(a => `
+                        <div class="bg-slate-800 p-2 rounded-lg border border-slate-700 flex justify-between items-center text-xs">
+                            <div class="flex items-center gap-2 overflow-hidden">
+                                <i class="fa-solid fa-file-arrow-down text-cyan-400 text-base"></i>
+                                <span class="truncate text-slate-200 font-medium" title="${a.fileName}">${a.fileName}</span>
+                                <span class="text-[10px] text-slate-400">(${a.uploader})</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="openDocPreviewModal('${a.fileName}', '${a.fileData}')" class="text-xs bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-300 px-2 py-1 rounded flex items-center gap-1" title="Ver Previsualización">
+                                    <i class="fa-solid fa-eye"></i> Ver
+                                </button>
+                                <button type="button" onclick="downloadAttachment(${a.id})" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded flex items-center gap-1">
+                                    <i class="fa-solid fa-download"></i>
+                                </button>
+                                <button type="button" onclick="deleteAttachment(${a.id})" class="text-xs bg-red-600/30 hover:bg-red-600/50 text-red-400 px-2 py-1 rounded">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+            } catch (e) {
+                console.error("Error al cargar comentarios/adjuntos:", e);
+            }
+        }
+
+        function previewSelectedFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            selectedFileName = file.name;
+            document.getElementById('unified-file-name').innerText = file.name;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                selectedFileBase64 = evt.target.result;
+
+                const box = document.getElementById('file-preview-box');
+                const content = document.getElementById('file-preview-content');
+                box.classList.remove('hidden');
+
+                if (file.type.startsWith('image/')) {
+                    content.innerHTML = `<img src="${selectedFileBase64}" class="max-h-52 rounded border border-slate-700 object-contain">`;
+                } else if (file.type === 'application/pdf') {
+                    content.innerHTML = `<embed src="${selectedFileBase64}" type="application/pdf" width="100%" height="220px" class="rounded">`;
+                } else {
+                    content.innerHTML = `<div class="p-4 text-center text-slate-300"><i class="fa-solid fa-file text-3xl text-cyan-400 mb-2"></i><p>${file.name}</p></div>`;
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearSelectedFile() {
+            selectedFileBase64 = null;
+            selectedFileName = '';
+            const input = document.getElementById('unified-file-input');
+            if (input) input.value = '';
+            const label = document.getElementById('unified-file-name');
+            if (label) label.innerText = '';
+            const box = document.getElementById('file-preview-box');
+            if (box) box.classList.add('hidden');
+        }
+
+        async function saveUnifiedCommentAndFile() {
+            if (!activeTaskIdForDetails) return;
+
+            const commentText = document.getElementById('unified-comment-text').value.trim();
+            if (!commentText && !selectedFileBase64) {
+                alert("Por favor escribe un comentario o selecciona un archivo para adjuntar.");
+                return;
+            }
+
+            const commTable = activeTaskTypeForDetails === 'wi' ? 'wi_comments' : (activeTaskTypeForDetails === 'doc' ? 'doc_control_comments' : 'comments');
+            const attTable = activeTaskTypeForDetails === 'wi' ? 'wi_attachments' : (activeTaskTypeForDetails === 'doc' ? 'doc_control_attachments' : 'attachments');
+
+            try {
+                const stmts = [];
+
+                if (commentText) {
+                    stmts.push({
+                        sql: `INSERT INTO ${commTable} (activity_id, author, text, created_at) VALUES (?, ?, ?, ?)`,
+                        args: [
+                            { type: "integer", value: activeTaskIdForDetails },
+                            { type: "text", value: currentUser || 'Usuario' },
+                            { type: "text", value: commentText },
+                            { type: "text", value: new Date().toLocaleString() }
+                        ]
+                    });
+                }
+
+                if (selectedFileBase64) {
+                    stmts.push({
+                        sql: `INSERT INTO ${attTable} (activity_id, file_name, file_data, uploader) VALUES (?, ?, ?, ?)`,
+                        args: [
+                            { type: "integer", value: activeTaskIdForDetails },
+                            { type: "text", value: selectedFileName },
+                            { type: "text", value: selectedFileBase64 },
+                            { type: "text", value: currentUser || 'Usuario' }
+                        ]
+                    });
+                }
+
+                await tursoQuery(stmts);
+                document.getElementById('unified-comment-text').value = '';
+                clearSelectedFile();
+                await loadCommentsAndAttachments();
+
+            } catch (err) {
+                alert("Error al guardar comentario/adjunto: " + err.message);
+            }
+        }
+
+        function downloadAttachment(attId) {
+            const att = currentLoadedAttachments.find(a => a.id === attId);
+            if (!att) return;
+
+            const link = document.createElement('a');
+            link.href = att.fileData;
+            link.download = att.fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        async function deleteAttachment(attId) {
+            if (!confirm("¿Está seguro de eliminar este archivo adjunto?")) return;
+
+            const attTable = activeTaskTypeForDetails === 'wi' ? 'wi_attachments' : (activeTaskTypeForDetails === 'doc' ? 'doc_control_attachments' : 'attachments');
+
+            try {
+                await tursoQuery([`DELETE FROM ${attTable} WHERE id=${attId};`]);
+                await loadCommentsAndAttachments();
+            } catch (err) {
+                alert("Error al eliminar adjunto: " + err.message);
+            }
+        }
+
+        function openDocPreviewModal(fileName, fileData) {
+            document.getElementById('doc-preview-title').innerText = `Previsualización: ${fileName}`;
+            const body = document.getElementById('doc-preview-body');
+
+            if (fileData.startsWith('data:image/')) {
+                body.innerHTML = `<img src="${fileData}" class="max-h-[75vh] object-contain rounded border border-slate-700">`;
+            } else if (fileData.startsWith('data:application/pdf')) {
+                body.innerHTML = `<embed src="${fileData}" type="application/pdf" width="100%" height="550px" class="rounded">`;
+            } else {
+                body.innerHTML = `
+                    <div class="text-center p-8 space-y-4">
+                        <i class="fa-solid fa-file-lines text-5xl text-cyan-400"></i>
+                        <p class="text-slate-200 font-semibold">${fileName}</p>
+                        <p class="text-xs text-slate-400">Este tipo de archivo no se puede previsualizar directamente en el navegador.</p>
+                        <a href="${fileData}" download="${fileName}" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-lg font-bold">
+                            <i class="fa-solid fa-download"></i> Descargar Archivo
+                        </a>
+                    </div>
+                `;
+            }
+
+            document.getElementById('doc-preview-modal').classList.remove('hidden');
+        }
+
+        function closeDocPreviewModal() {
+            document.getElementById('doc-preview-modal').classList.add('hidden');
+        }
+
+        // MÓDULO GALERÍA
+        async function loadGallery() {
+            try {
+                const res = await tursoQuery([`SELECT id, title, description, category, image_data, created_at FROM process_gallery ORDER BY id DESC;`]);
+                const rows = res[0]?.response?.result?.rows || [];
+
+                globalGallery = rows.map(r => ({
+                    id: Number(r[0].value),
+                    title: r[1].value,
+                    description: r[2]?.value || '',
+                    category: r[3].value,
+                    imageData: r[4].value,
+                    createdAt: r[5].value
+                }));
+
+                populateGalleryCategories();
+                renderGallery(globalGallery);
+            } catch (e) {
+                console.error("Error al cargar galería:", e);
+            }
+        }
+
+        function populateGalleryCategories() {
+            const select = document.getElementById('gallery-category-filter');
+            if (!select) return;
+
+            const categories = Array.from(new Set(globalGallery.map(g => g.category)));
+            select.innerHTML = '<option value="ALL">Todas las Categorías</option>';
+            categories.forEach(cat => {
+                select.innerHTML += `<option value="${cat}">${cat}</option>`;
+            });
+        }
+
+        function renderGallery(items) {
+            const grid = document.getElementById('gallery-grid');
+            if (!grid) return;
+
+            if (items.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center p-8 text-slate-500 italic">No hay fotos en la galería. Haz clic en "Subir Nueva Foto".</div>`;
+                return;
+            }
+
+            grid.innerHTML = items.map(item => `
+                <div class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-lg hover:border-emerald-500/50 transition-all flex flex-col group">
+                    <div class="relative h-48 bg-slate-900 overflow-hidden cursor-pointer" onclick="openImageViewer(${item.id})">
+                        <img src="${item.imageData}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-300">
+                        <span class="absolute top-2 left-2 bg-slate-900/80 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2 py-0.5 rounded">
+                            ${item.category}
+                        </span>
+                    </div>
+                    <div class="p-4 flex-1 flex flex-col justify-between space-y-2">
+                        <div>
+                            <h4 class="font-bold text-sm text-white truncate">${item.title}</h4>
+                            <p class="text-xs text-slate-400 line-clamp-2 mt-1">${item.description || 'Sin descripción'}</p>
+                        </div>
+                        <div class="flex justify-between items-center pt-2 border-t border-slate-700/60 text-[10px] text-slate-500">
+                            <span>${item.createdAt}</span>
+                            <button type="button" onclick="deleteGalleryItem(${item.id})" class="text-red-400 hover:text-red-300 p-1" title="Eliminar Foto"><i class="fa-solid fa-trash-can"></i></button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterGallery() {
+            const query = (document.getElementById('gallery-search')?.value || '').toLowerCase();
+            const cat = document.getElementById('gallery-category-filter')?.value || 'ALL';
+
+            const filtered = globalGallery.filter(item => {
+                const matchQuery = item.title.toLowerCase().includes(query) || item.description.toLowerCase().includes(query);
+                const matchCat = cat === 'ALL' || item.category === cat;
+                return matchQuery && matchCat;
+            });
+
+            renderGallery(filtered);
+        }
+
+        function resetGalleryFilters() {
+            if (document.getElementById('gallery-search')) document.getElementById('gallery-search').value = '';
+            if (document.getElementById('gallery-category-filter')) document.getElementById('gallery-category-filter').value = 'ALL';
+            renderGallery(globalGallery);
+        }
+
+        function openGalleryModal() {
+            document.getElementById('img-title').value = '';
+            document.getElementById('img-category').value = '';
+            document.getElementById('img-description').value = '';
+            document.getElementById('img-file').value = '';
+            document.getElementById('gallery-modal').classList.remove('hidden');
+        }
+
+        function closeGalleryModal() {
+            document.getElementById('gallery-modal').classList.add('hidden');
+        }
+
+        async function saveGalleryItem(e) {
+            e.preventDefault();
+            const title = document.getElementById('img-title').value.trim();
+            const category = document.getElementById('img-category').value.trim();
+            const description = document.getElementById('img-description').value.trim();
+            const fileInput = document.getElementById('img-file');
+
+            if (!fileInput.files[0]) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(evt) {
+                const imageData = evt.target.result;
+                try {
+                    await tursoQuery([{
+                        sql: `INSERT INTO process_gallery (title, description, category, image_data, created_at) VALUES (?, ?, ?, ?, ?);`,
+                        args: [
+                            { type: "text", value: title },
+                            { type: "text", value: description },
+                            { type: "text", value: category },
+                            { type: "text", value: imageData },
+                            { type: "text", value: new Date().toLocaleDateString() }
+                        ]
+                    }]);
+
+                    closeGalleryModal();
+                    await loadGallery();
+                } catch (err) {
+                    alert("Error al guardar foto: " + err.message);
+                }
+            };
+            reader.readAsDataURL(fileInput.files[0]);
+        }
+
+        function openImageViewer(id) {
+            const item = globalGallery.find(g => g.id === id);
+            if (!item) return;
+
+            document.getElementById('viewer-title').innerText = item.title;
+            document.getElementById('viewer-img').src = item.imageData;
+            document.getElementById('viewer-category').innerText = item.category;
+            document.getElementById('viewer-description').innerText = item.description || 'Sin descripción';
+
+            document.getElementById('image-viewer-modal').classList.remove('hidden');
+        }
+
+        function closeImageViewer() {
+            document.getElementById('image-viewer-modal').classList.add('hidden');
+        }
+
+        async function deleteGalleryItem(id) {
+            if (!confirm("¿Está seguro de eliminar esta imagen de la galería?")) return;
+            try {
+                await tursoQuery([`DELETE FROM process_gallery WHERE id=${id};`]);
+                await loadGallery();
+            } catch (err) {
+                alert("Error al eliminar imagen: " + err.message);
+            }
+        }
+
+        // GESTIÓN DE USUARIOS
+        async function openUsersListModal() {
+            document.getElementById('users-list-modal').classList.remove('hidden');
+            await loadUsersList();
+        }
+
+        function closeUsersListModal() {
+            document.getElementById('users-list-modal').classList.add('hidden');
+        }
+
+        async function loadUsersList() {
+            try {
+                const res = await tursoQuery([`SELECT id, username FROM users ORDER BY username ASC;`]);
+                const rows = res[0]?.response?.result?.rows || [];
+                rawUsersList = rows.map(r => ({
+                    id: Number(r[0].value),
+                    username: r[1].value
+                }));
+                renderUsersTable(rawUsersList);
+            } catch (e) {
+                console.error("Error al cargar lista de usuarios:", e);
+            }
+        }
+
+        function renderUsersTable(users) {
+            const body = document.getElementById('users-table-body');
+            const badge = document.getElementById('users-count-badge');
+            if (badge) badge.innerText = `${users.length} usuarios registrados`;
+
+            if (users.length === 0) {
+                body.innerHTML = `<tr><td colspan="4" class="p-3 text-center text-slate-500 italic">No se encontraron usuarios.</td></tr>`;
+                return;
+            }
+
+            body.innerHTML = users.map(u => `
+                <tr class="hover:bg-slate-700/40 transition-all">
+                    <td class="p-3 font-mono text-slate-400">#${u.id}</td>
+                    <td class="p-3 font-semibold text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-circle-user text-cyan-400"></i> ${u.username}
+                    </td>
+                    <td class="p-3"><span class="bg-cyan-500/20 text-cyan-300 text-[10px] font-bold px-2 py-0.5 rounded">Activo</span></td>
+                    <td class="p-3 text-right">
+                        <button type="button" onclick="deleteUser(${u.id}, '${u.username}')" class="text-red-400 hover:text-red-300 p-1" title="Eliminar Usuario">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function filterUsersList() {
+            const query = (document.getElementById('user-search-input')?.value || '').toLowerCase();
+            const filtered = rawUsersList.filter(u => u.username.toLowerCase().includes(query));
+            renderUsersTable(filtered);
+        }
+
+        function openUserModal() {
+            document.getElementById('new-username').value = '';
+            document.getElementById('new-password').value = '';
+            document.getElementById('user-modal').classList.remove('hidden');
+        }
+
+        function closeUserModal() {
+            document.getElementById('user-modal').classList.add('hidden');
+        }
+
+        async function saveUser(e) {
+            e.preventDefault();
+            const user = document.getElementById('new-username').value.trim();
+            const pass = document.getElementById('new-password').value.trim();
+
+            try {
+                await tursoQuery([{
+                    sql: "INSERT INTO users (username, password) VALUES (?, ?);",
+                    args: [{ type: "text", value: user }, { type: "text", value: pass }]
+                }]);
+
+                closeUserModal();
+                await loadUsersList();
+                alert(`Usuario ${user} creado exitosamente.`);
+            } catch (err) {
+                alert("Error al crear usuario: " + err.message);
+            }
+        }
+
+        async function deleteUser(id, username) {
+            if (username === 'Daniel Martinez' || username === 'Daniel Moreno') {
+                alert("Los usuarios administradores principales no pueden ser eliminados.");
+                return;
+            }
+            if (!confirm(`¿Está seguro de eliminar al usuario "${username}"?`)) return;
+
+            try {
+                await tursoQuery([`DELETE FROM users WHERE id=${id};`]);
+                await loadUsersList();
+            } catch (err) {
+                alert("Error al eliminar usuario: " + err.message);
+            }
+        }
+
+        function openChangePasswordModal() {
+            document.getElementById('new-user-pass').value = '';
+            document.getElementById('confirm-user-pass').value = '';
+            document.getElementById('change-pass-modal').classList.remove('hidden');
+        }
+
+        function closeChangePasswordModal() {
+            document.getElementById('change-pass-modal').classList.add('hidden');
+        }
+
+        async function handleChangePassword(e) {
+            e.preventDefault();
+            const pass1 = document.getElementById('new-user-pass').value.trim();
+            const pass2 = document.getElementById('confirm-user-pass').value.trim();
+
+            if (pass1 !== pass2) {
+                alert("Las contraseñas no coinciden.");
+                return;
+            }
+
+            try {
+                await tursoQuery([{
+                    sql: "UPDATE users SET password=? WHERE username=?;",
+                    args: [{ type: "text", value: pass1 }, { type: "text", value: currentUser }]
+                }]);
+
+                closeChangePasswordModal();
+                alert("Contraseña actualizada exitosamente.");
+            } catch (err) {
+                alert("Error al cambiar contraseña: " + err.message);
+            }
+        }
+
+        // EXPORTACIÓN A EXCEL GENERAL
+        function exportToExcel(type = 'activities') {
+            const isWi = type === 'wi';
+            const data = isWi ? globalWiTasks : globalTasks;
+
+            const exportData = data.map(t => ({
+                "ID": t.id,
+                "Título": t.title,
+                "Responsable": t.assigned_to,
+                "Fecha Inicio": t.start_date,
+                "Fecha Fin": t.end_date,
+                "Avance (%)": t.progress,
+                "Estado": t.status
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, isWi ? "WI_Plan" : "Actividades");
+            XLSX.writeFile(wb, `${isWi ? 'WI_Plan' : 'Actividades'}_Inventec_${new Date().toISOString().split('T')[0]}.xlsx`);
+        }
+    </script>
+</body>
+</html>
